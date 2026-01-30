@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cornell Notes - Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .tema-card {
+            background: white;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .nota-link {
+            display: block;
+            padding: 5px 0;
+            color: #2c3e50;
+            text-decoration: none;
+            border-bottom: 1px dotted #ccc;
+        }
+
+        .nota-link:hover {
+            color: #3498db;
+        }
+
+        button {
+            cursor: pointer;
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+        }
+
+        .btn-add-nota {
+            background: #3498db;
+            font-size: 0.8em;
+            margin-top: 10px;
+        }
+
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .btn-delete {
+            background: #e74c3c;
+            padding: 5px 10px;
+            font-size: 0.7em;
+        }
+
+        .tema-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nota-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px dotted #ccc;
+        }
+
+        .nota-item:hover {
+            background: #f9f9f9;
+        }
+
+        .backup-controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .backup-controls button {
+            font-size: 0.75rem;
+            padding: 5px 10px;
+        }
+
+        .notas-lista {
+            margin-left: 20px;
+            /* Indentación tipo árbol */
+            border-left: 2px solid #ddd;
+            padding-left: 15px;
+        }
+
+        .search-container {
+            margin: 20px 0;
+        }
+
+        #buscador {
+            width: 100%;
+            padding: 12px;
+            font-size: 1rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            /* Para que el padding no desborde el ancho */
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #buscador:focus {
+            border-color: #3498db;
+        }
+
+        /* Estilo para resaltar cuando no hay resultados */
+        .no-results {
+            text-align: center;
+            color: #888;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Mis Notas</h1>
+            <div>
+                <input type="text" id="nuevoTemaInput" placeholder="Nuevo tema...">
+                <button onclick="crearTema()">+ Añadir Tema</button>
+            </div>
+
+            <div class="backup-controls">
+                <button onclick="exportarJSON()" style="background: #8e44ad;">📥 Exportar JSON</button>
+                <button onclick="document.getElementById('importInput').click()" style="background: #d35400;">📤
+                    Importar JSON</button>
+                <input type="file" id="importInput" style="display: none;" accept=".json"
+                    onchange="importarJSON(event)">
+            </div>
+
+            
+        </header>
+        <div class="search-container">
+            <input type="text" id="buscador" placeholder="🔍 Buscar por tema o título de nota..."
+                onkeyup="filtrarNotas()">
+        </div>
+
+        <div id="dashboard">
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script>
+        function render() {
+            const data = CornellDB.obtenerTodo();
+            const container = document.getElementById('dashboard');
+            container.innerHTML = '';
+
+            for (const tema in data.temas) {
+                const div = document.createElement('div');
+                div.className = 'tema-card';
+                div.innerHTML = `
+                <div class="tema-header">
+                    <h3>📁 ${tema}</h3>
+                    <button class="btn-delete" onclick="borrarTema('${tema}')">🗑️ Borrar Tema</button>
+                </div>
+                <div class="notas-lista">
+                    ${data.temas[tema].map(n => `
+                        <div class="nota-item">
+                            <a href="#" class="nota-link" onclick="irANota('${tema}', ${n.id})">📝 ${n.titulo}</a>
+                            <button class="btn-delete" onclick="borrarNota('${tema}', ${n.id})">✕</button>
+                        </div>
+                    `).join('')}
+                </div>
+                <button class="btn-add-nota" onclick="nuevaNota('${tema}')">+ Nueva Nota</button>
+            `;
+                container.appendChild(div);
+            }
+        }
+
+        function exportarJSON() {
+            const data = localStorage.getItem('cornell_app');
+            if (!data) return alert("No hay datos para exportar");
+
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `respaldo_cornell_${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importarJSON(event) {
+            const archivo = event.target.files[0];
+            if (!archivo) return;
+
+            const lector = new FileReader();
+            lector.onload = function (e) {
+                try {
+                    const contenido = JSON.parse(e.target.result);
+
+                    // Validación mínima de estructura
+                    if (contenido.temas) {
+                        if (confirm("Al importar, se sobrescribirán tus notas actuales. ¿Deseas continuar?")) {
+                            CornellDB.guardarTodo(contenido);
+                            location.reload(); // Recargamos para ver los cambios
+                        }
+                    } else {
+                        alert("El archivo no tiene un formato válido de Cornell App.");
+                    }
+                } catch (error) {
+                    alert("Error al leer el archivo JSON.");
+                }
+            };
+            lector.readAsText(archivo);
+        }
+
+        function borrarTema(nombre) {
+            if (CornellDB.eliminarTema(nombre)) render();
+        }
+
+        function borrarNota(tema, id) {
+            if (confirm("¿Eliminar esta nota?")) {
+                CornellDB.eliminarNota(tema, id);
+                render();
+            }
+        }
+        function crearTema() {
+            const input = document.getElementById('nuevoTemaInput');
+            if (input.value.trim()) {
+                CornellDB.añadirTema(input.value.trim());
+                input.value = '';
+                render();
+            }
+        }
+
+        function nuevaNota(tema) {
+            const id = CornellDB.crearNota(tema);
+            irANota(tema, id);
+        }
+
+        function irANota(tema, id) {
+            window.location.href = `nota.html?tema=${encodeURIComponent(tema)}&id=${id}`;
+        }
+
+        function filtrarNotas() {
+            const termino = document.getElementById('buscador').value.toLowerCase();
+            const temas = document.querySelectorAll('.tema-card');
+            let hayResultados = false;
+
+            temas.forEach(card => {
+                const tituloTema = card.querySelector('h3').innerText.toLowerCase();
+                const notas = card.querySelectorAll('.nota-item');
+                let temaTieneCoincidencia = tituloTema.includes(termino);
+                let notasVisiblesEnTema = 0;
+
+                notas.forEach(nota => {
+                    const tituloNota = nota.querySelector('.nota-link').innerText.toLowerCase();
+                    if (tituloNota.includes(termino) || tituloTema.includes(termino)) {
+                        nota.style.display = 'flex';
+                        notasVisiblesEnTema++;
+                        hayResultados = true;
+                    } else {
+                        nota.style.display = 'none';
+                    }
+                });
+
+                // ... código anterior ...
+                const mensaje = document.getElementById('mensaje-vacio');
+                if (!hayResultados && termino !== "") {
+                    if (!mensaje) {
+                        const div = document.createElement('div');
+                        div.id = 'mensaje-vacio';
+                        div.className = 'no-results';
+                        div.innerHTML = "<h3>No se encontraron notas con ese nombre 😅</h3>";
+                        document.getElementById('dashboard').appendChild(div);
+                    }
+                } else if (mensaje) {
+                    mensaje.remove();
+                }
+            });
+        }
+
+        render();
+    </script>
+
+</body>
+
+</html>

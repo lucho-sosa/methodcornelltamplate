@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Editor Cornell</title>
+    <button class="btn-delete" onclick="eliminarYSalir()" style="float: right;">🗑️ Eliminar Nota</button>
+    <style>
+        body {
+            font-family: 'Helvetica', Arial, sans-serif;
+            background: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .editor-container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 40px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            min-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .input-titulo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            border: none;
+            outline: none;
+            width: 70%;
+        }
+
+        .cornell-main {
+            display: flex;
+            flex: 1;
+            border: 1px solid #ccc;
+            min-height: 500px;
+        }
+
+        /* Columna Izquierda: Ideas Clave */
+        .cues {
+            width: 30%;
+            border-right: 2px solid #333;
+            padding: 10px;
+            background: #fafafa;
+        }
+
+        /* Columna Derecha: Notas */
+        .notes {
+            width: 70%;
+            padding: 10px;
+        }
+
+        /* Sección Inferior: Resumen */
+        .summary {
+            margin-top: 10px;
+            border: 2px solid #333;
+            padding: 10px;
+            min-height: 100px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 90%;
+            border: none;
+            resize: none;
+            outline: none;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        h4 {
+            margin: 0 0 10px 0;
+            color: #555;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            border: none;
+        }
+
+        .btn-save {
+            background: #27ae60;
+            color: white;
+            font-weight: bold;
+        }
+
+        .btn-back {
+            background: #95a5a6;
+            color: white;
+            margin-right: 10px;
+        }
+
+        /* Estilos para la pantalla (ya los tienes, asegúrate de que el contenedor sea flexible) */
+        .editor-container {
+            transition: all 0.3s ease;
+        }
+
+        /* --- MAGIA PARA IMPRESIÓN --- */
+        @media print {
+
+            /* Ocultar botones y elementos innecesarios */
+            .controls,
+            .btn-delete,
+            .btn-save,
+            .btn-back {
+                display: none !important;
+            }
+
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .editor-container {
+                box-shadow: none;
+                margin: 0;
+                width: 100%;
+                max-width: 100%;
+                padding: 0;
+            }
+
+            /* Forzar que los bordes se vean al imprimir */
+            .cornell-main,
+            .cues,
+            .notes,
+            .summary {
+                border: 2px solid black !important;
+            }
+
+            textarea {
+                border: none;
+                overflow: hidden;
+                /* Quita el scroll en papel */
+            }
+
+            /* Asegurar que el layout se mantenga igual en papel */
+            .cornell-main {
+                display: flex !important;
+                flex-direction: row !important;
+                height: 700px;
+                /* Altura fija para la hoja */
+            }
+        }
+
+        .toolbar {
+            background: #f1f1f1;
+            padding: 5px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .toolbar button {
+            padding: 2px 8px;
+            font-size: 0.8rem;
+            background: white;
+            border: 1px solid #ccc;
+            color: #333;
+        }
+
+        .toolbar button:hover {
+            background: #e0e0e0;
+        }
+
+        .editable-area {
+            width: 100%;
+            height: 400px;
+            outline: none;
+            overflow-y: auto;
+            font-size: 1rem;
+            line-height: 1.5;
+            text-align: left;
+        }
+
+        /* Estilo para las listas dentro del editor */
+        .editable-area ul,
+        .editable-area ol {
+            padding-left: 25px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="editor-container">
+
+        <div class="controls">
+            <button class="btn-back" onclick="window.location.href='index.html'">⬅ Volver</button>
+            <button class="btn-save" onclick="guardarNota()">💾 Guardar Nota</button>
+            <button onclick="window.print()" style="background: #34495e; color: white;">🖨️ Imprimir a PDF /
+                Papel</button>
+            <button id="btn-repaso" onclick="toggleRepaso()" style="background: #f39c12; color: white;">👁️ Modo
+                Repaso</button>
+        </div>
+
+        <header>
+            <input type="text" id="titulo" class="input-titulo" placeholder="Título de la nota...">
+            <div id="fecha" style="color: #666;"></div>
+        </header>
+
+        <div class="cornell-main">
+            <div class="cues">
+                <h4>Ideas Clave / Preguntas</h4>
+                <textarea id="cue" placeholder="Escribe aquí los conceptos clave..."></textarea>
+            </div>
+            <div class="notes">
+                <div class="toolbar">
+                    <button onclick="ejecutarComando('insertUnorderedList')" title="Lista con viñetas">bullet •</button>
+                    <button onclick="ejecutarComando('insertOrderedList')" title="Lista numerada">1. Numeración</button>
+                    <button onclick="ejecutarComando('outdent')" title="Quitar nivel">⬅</button>
+                    <button onclick="ejecutarComando('indent')" title="Aumentar nivel (Tab)">➡</button>
+                </div>
+                <h4>Notas de Clase / Contenido</h4>
+                <div id="notes" contenteditable="true" class="editable-area"></div>
+            </div>
+        </div>
+
+        <div class="summary">
+            <h4>Resumen</h4>
+            <textarea id="summary" placeholder="Sintetiza lo aprendido en una o dos frases..."></textarea>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const temaNombre = params.get('tema');
+        const notaId = params.get('id');
+
+        // Cargar la nota usando nuestro nuevo objeto
+        const nota = CornellDB.obtenerNota(temaNombre, notaId);
+
+        if (nota) {
+            document.getElementById('titulo').value = nota.titulo;
+            document.getElementById('cue').value = nota.cue;
+            document.getElementById('notes').value = nota.notes;
+            document.getElementById('summary').value = nota.summary;
+            document.getElementById('fecha').innerText = new Date(nota.id).toLocaleDateString();
+        }
+
+        function guardarNota() {
+            const campos = {
+                titulo: document.getElementById('titulo').value,
+                cue: document.getElementById('cue').value,
+                notes: document.getElementById('notes').value,
+                summary: document.getElementById('summary').value
+            };
+
+            CornellDB.actualizarNota(temaNombre, notaId, campos);
+            alert("¡Guardado!");
+        }
+
+        function eliminarYSalir() {
+            if (confirm("¿Estás seguro de que quieres borrar esta nota permanentemente?")) {
+                CornellDB.eliminarNota(temaNombre, notaId);
+                window.location.href = 'index.html';
+            }
+        }
+
+        // 1. Función para los botones de la toolbar
+        function ejecutarComando(comando) {
+            document.execCommand(comando, false, null);
+            document.getElementById('notes').focus();
+        }
+
+        // 2. Modificar la carga de la nota
+        if (nota) {
+            document.getElementById('titulo').value = nota.titulo;
+            document.getElementById('cue').value = nota.cue;
+            // IMPORTANTE: Para div usamos innerHTML
+            document.getElementById('notes').innerHTML = nota.notes || "";
+            document.getElementById('summary').value = nota.summary;
+            document.getElementById('fecha').innerText = new Date(nota.id).toLocaleDateString();
+        }
+
+        // 3. Modificar la función guardarNota
+        function guardarNota() {
+            const campos = {
+                titulo: document.getElementById('titulo').value,
+                cue: document.getElementById('cue').value,
+                // IMPORTANTE: Guardamos el HTML del div
+                notes: document.getElementById('notes').innerHTML,
+                summary: document.getElementById('summary').value
+            };
+
+            CornellDB.actualizarNota(temaNombre, notaId, campos);
+            alert("¡Nota guardada con éxito!");
+        }
+
+        // Bonus: Permitir usar la tecla TAB para indentar
+        document.getElementById('notes').addEventListener('keydown', function (e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    document.execCommand('outdent');
+                } else {
+                    document.execCommand('indent');
+                }
+            }
+        });
+
+        let modoRepaso = false;
+        function toggleRepaso() {
+            modoRepaso = !modoRepaso;
+            const columnaNotas = document.querySelector('.notes');
+            const btn = document.getElementById('btn-repaso');
+
+            if (modoRepaso) {
+                columnaNotas.style.visibility = 'hidden'; // Oculta pero mantiene el espacio
+                btn.innerText = "👁️ Mostrar Notas";
+                btn.style.background = "#2980b9";
+            } else {
+                columnaNotas.style.visibility = 'visible';
+                btn.innerText = "👁️ Modo Repaso";
+                btn.style.background = "#f39c12";
+            }
+        }
+    </script>
+
+</body>
+
+</html>
